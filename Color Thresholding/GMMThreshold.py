@@ -24,13 +24,16 @@ filename = 'YellowWindow.npy'
 img = cv2.imread(imgname)
 
 # SCALE DOWN IMAGE SIZE
-scale = .05
+scale = .5
 width = int(img.shape[1] * scale)
 height = int(img.shape[0] * scale)
 dim = (width, height)
 # resize image
 img_thresh = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
-GMMin = 'Yellow_GMM_4.npz'
+# Convert image to HSV
+img_thresh = cv2.cvtColor(img_thresh, cv2.COLOR_BGR2HSV)
+
+GMMin = 'Yellow_GMM_HSV_3.npz'
 
 # load GMM here
 npzfile = np.load(GMMin)
@@ -66,13 +69,14 @@ icov = np.linalg.inv(cov)
 p0 = 1/(((2*3.14159)**3*np.linalg.det(cov)))**(0.5)
 pmax = np.zeros(k)
 for j in range(0,k):
-	pmax[j] =  p0[j]*np.exp(.5*np.linalg.multi_dot([[0,0,0],icov[j],[0,0,0]]))
+	pmax[j] =  pi[j]*p0[j]*np.exp(-.5*np.linalg.multi_dot([[0,0,0],icov[j],[0,0,0]]))
 
 
 
 # Loop through pixels and compare each value to the threshold.
 x=0
 y=0
+post=np.zeros((height,width))
 p = np.zeros(k)
 
 for col in img_thresh:
@@ -80,17 +84,28 @@ for col in img_thresh:
 		for j in range(0,k):
 			temp = pixel-mean[j]
 			p[j] = pi[j]*p0[j]*np.exp(-.5*np.linalg.multi_dot([temp,icov[j],temp]))/pmax[j]
-		post = np.sum(p)
+		post[y,x] = np.sum(p)
 		#print(post)
-		if post <= 0.000001:
+		if post[y,x] <= 1e-35:
 			# set the pixel to neon pink to stand out
-			img_thresh[y,x] = [199,110,255]
+			#img_thresh[y,x] = [199,110,255]
+			# use this for HSL instead
+			img_thresh[y,x] = [0, 255, 255]
 		x = x+1
 	x = 0
 	y = y+1
 
+# Create an array of probabilities, make into greyscale
+post_max = np.amax(post)
+post_norm = 1-(post/post_max)
+
+#post_img = cv2.cvtColor(post_norm, cv2.COLOR_GRAY2BGR)
+
+
 plt.ion() # This prevents the program from hanging at the end
-plt.subplot(2,1,1),plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-plt.subplot(2,1,2),plt.imshow(cv2.cvtColor(img_thresh, cv2.COLOR_BGR2RGB))
+plt.subplot(3,1,1),plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+#plt.subplot(3,1,2),plt.imshow(cv2.cvtColor(img_thresh, cv2.COLOR_BGR2RGB))
+plt.subplot(3,1,2),plt.imshow(cv2.cvtColor(img_thresh, cv2.COLOR_HSV2RGB))
+plt.subplot(3,1,3),plt.imshow(post_norm, cmap="gray")
 plt.show()
 

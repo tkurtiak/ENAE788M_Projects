@@ -21,7 +21,7 @@ filename = 'YellowWindow.npy'
 img = cv2.imread(imgname)
 
 # SCALE DOWN IMAGE SIZE
-scale = .1
+scale = .5
 width = int(img.shape[1] * scale)
 height = int(img.shape[0] * scale)
 dim = (width, height)
@@ -30,12 +30,22 @@ img_thresh = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
 
 
 # load current training dataset
-BGR_set = np.load(filename)
+#BGR_set = np.load(filename)[0:3]
+HSV_set = np.load(filename)[3:]
 
-# Calculate cov
-covariance = np.cov(BGR_set)
+# Calculate single gausian
+# USE BGR COLORS
+#covariance = np.cov(BGR_set)
+#icovariance = np.linalg.inv(covariance)
+#mu = np.mean(BGR_set,axis = 1)
+
+### USE HSV COLORS
+covariance = np.cov(HSV_set)
 icovariance = np.linalg.inv(covariance)
-mu = np.mean(BGR_set,axis = 1)
+mu = np.mean(HSV_set,axis = 1)
+thresh  = 1e-62 # threshold for Yellow in HSV is 1e-62
+# Convert image to HSV
+img_thresh = cv2.cvtColor(img_thresh, cv2.COLOR_BGR2HSV)
 
 # resize or subsample image to improve run speed
 
@@ -63,15 +73,18 @@ for col in img_thresh:
 		#post = np.linalg.norm((p*prior)/2)
 		post = p
 		#print(post)
-		if post <= 0.15:
+		if post <= thresh:
 			# set the pixel to neon pink to stand out
-			img_thresh[y,x] = [199,110,255]
+			#img_thresh[y,x] = [199,110,255]
+			# use this for HSL instead
+			img_thresh[y,x] = [0, 255, 255]
 		x = x+1
 	x = 0
 	y = y+1
 
 plt.ion() # This prevents the program from hanging at the end
 plt.subplot(2,1,1),plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-plt.subplot(2,1,2),plt.imshow(cv2.cvtColor(img_thresh, cv2.COLOR_BGR2RGB))
+#plt.subplot(2,1,2),plt.imshow(cv2.cvtColor(img_thresh, cv2.COLOR_BGR2RGB))
+plt.subplot(2,1,2),plt.imshow(cv2.cvtColor(img_thresh, cv2.COLOR_HSV2RGB))
 plt.show()
 

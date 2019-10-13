@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D 
+import color_correct as cc
 
 
 ## Selected training img
@@ -14,19 +15,22 @@ root.withdraw()
 imgname = tkFileDialog.askopenfilename()
 
 # Save/Load File name for RGB values
-filename = 'MaroonWindow.npy'
-filename = 'YellowWindow.py'
+#filename = 'MaroonWindow.npy'
+filename = 'YellowWindow_CC_HSV.npy'
 
 # load image
 img_raw = cv2.imread(imgname)
+# Color correct
+#img_corrected = cc.color_correct(img_raw)
+img_corrected = img_raw
 # SCALE DOWN IMAGE SIZE
-scale = .1
-width = int(img_raw.shape[1] * scale)
-height = int(img_raw.shape[0] * scale)
+scale = 1
+width = int(img_corrected.shape[1] * scale)
+height = int(img_corrected.shape[0] * scale)
 dim = (width, height)
 # resize image
-img = cv2.resize(img_raw, dim, interpolation = cv2.INTER_AREA)
-
+img = cv2.resize(img_corrected, dim, interpolation = cv2.INTER_AREA)
+HSV_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
 # load current training dataset
 try:  # If it exists, load
@@ -34,11 +38,17 @@ try:  # If it exists, load
 	B = temp[0]
 	G = temp[1]
 	R = temp[2]
+	H = temp[3]
+	S = temp[4]
+	V = temp[5]
 except:	# Else initialize to zero
 	print('no starting data found, creating my own.  MUAHAHAHA')
 	B =np.array([])
 	G =np.array([])
 	R =np.array([])
+	H =np.array([])
+	S =np.array([])
+	V =np.array([])
 
 # Select rectangular regions of interest.  
 # Be careful not to select bad data or this will make our life hell
@@ -53,7 +63,7 @@ for sample in samples:
 	xS = slice(sample[1],sample[1]+sample[3],1)
 	# extract sample space
 	sampleImg = img[xS,yS,:]
-
+	sample_HSV_img = HSV_img[xS,yS,:]
 
 	# Convert the RGB values to 1D arrays for processing
 
@@ -61,20 +71,34 @@ for sample in samples:
 	G = np.append(G,np.ndarray.flatten(sampleImg[1],order='C'))
 	R = np.append(R,np.ndarray.flatten(sampleImg[2],order='C'))
 
+	H = np.append(H,np.ndarray.flatten(sample_HSV_img[0],order='C'))
+	S = np.append(S,np.ndarray.flatten(sample_HSV_img[1],order='C'))
+	V = np.append(V,np.ndarray.flatten(sample_HSV_img[2],order='C'))
+
 
 # Save newly added training points to dataset
-np.save(filename,np.vstack((B,G,R)))
-# Make a 3D ScaTTER Of RGB values
-fig = plt.figure()
-ax = Axes3D(fig)
-#ax = fig.add_subplot(111, projection='3d')
-i=0
-for i in range(0,R.shape[0]-1):
-	ax.scatter(R[i], G[i], B[i],color='k')
+np.save(filename,np.vstack((B,G,R,H,S,V)))
 
+plotData = 1
 
-ax.set_xlabel('B')
-ax.set_ylabel('G')
-ax.set_zlabel('R')
-plt.ion() # This prevents the program from hanging at the end
-plt.show()
+if plotData == 1:
+	# Make a 3D ScaTTER Of RGB values
+	plt.ion() # This prevents the program from hanging at the end
+	fig = plt.figure()
+	ax = Axes3D(fig)
+
+	fig2 = plt.figure()
+	ax2 = Axes3D(fig2)
+	#ax = fig.add_subplot(111, projection='3d')
+	i=0
+	for i in range(0,R.shape[0]-1):
+		ax.scatter(R[i], G[i], B[i],color='k')
+		ax2.scatter(H[i], S[i], V[i],color='k')
+
+	ax.set_xlabel('B')
+	ax.set_ylabel('G')
+	ax.set_zlabel('R')
+	ax2.set_xlabel('H')
+	ax2.set_ylabel('S')
+	ax2.set_zlabel('V')
+	plt.show()
