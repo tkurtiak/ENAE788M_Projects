@@ -35,6 +35,20 @@ def intersection(L1, L2):
 def callback(x):
     pass
 
+def select_lines(image, x1, x2, y1, y2, colour):
+    lower = colour[0]
+    upper = colour[1]
+
+    # blue = np.linspace(lower[0], upper[0], 1)
+    # green = np.linspace(lower[1], upper[1], 1)
+    # red = np.linspace(lower[2], upper[2], 1)
+
+    if lower[0] < image[y1,x1,0] < upper[0] and lower[0] < image[y2,x2,0] < upper[0]:
+        if lower[1] < image[y1,x1,1] < upper[1] and lower[1] < image[y2,x2,1] < upper[1]:
+            if lower[2] < image[y1,x1,2] < upper[2] and lower[2] < image[y2,x2,2] < upper[2]:
+                return True
+
+
 def main():
 
     dirpath = os.getcwd()
@@ -59,6 +73,8 @@ def main():
                 # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(1,1))
                 # fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
 
+                kernel = np.ones((3,3), np.uint8)
+
                 frame = image.copy()
 
                 # fgmask = fgbg.apply(frame)
@@ -68,23 +84,27 @@ def main():
 
                 # if cv2.waitKey(0) & 0xff == 27:
                 #     cv2.destroyAllWindows()
+                median = cv2.medianBlur(frame,5)
 
-                # Find Canny edges 
+                # hsv = cv2.cvtColor(median, cv2.COLOR_BGR2HSV)
 
                 # Tolerance levels
-                tb, tg, tr = 30, 400, 400
+                tb, tg, tr = 5, 5, 5
                 # # BGR!
-                lower = np.array([98 - tb,180 - tg,83 - tr])
-                upper = np.array([70 + tb,175 + tg,180 + tr])
+                # HSV 22, 50, 67; 42 45 100
+                lower = np.array([21 - tb, 85 - tg, 0 - tr])
+                upper = np.array([92 + tb, 173 + tg, 255 + tr])
 
                 # thresh = cv2.threshold(gray, 10, 100, cv2.THRESH_BINARY)[1]
-                # thresh = cv2.erode(thresh, None, iterations=2)
-                # thresh = cv2.dilate(thresh, None, iterations=2)
-
-                median = cv2.medianBlur(frame,5)
 
                 mask = cv2.inRange(median, lower, upper)
                 res = cv2.bitwise_and(frame, frame, mask = mask)
+
+                blank = np.zeros([np.shape(res)[0],np.shape(res)[1],3])
+
+                # res = cv2.medianBlur(res,5)
+                # res = cv2.erode(res, kernel, iterations=1)
+                # res = cv2.dilate(res, kernel, iterations=5)
 
                 # cv2.imshow('frame',frame)
                 # cv2.imshow('mask',mask)
@@ -93,12 +113,12 @@ def main():
                 if cv2.waitKey(0) & 0xff == 27:
                     cv2.destroyAllWindows()
 
-                # thresh = cv2.threshold(gray, 10, 100, cv2.THRESH_BINARY)[1]
-                # thresh = cv2.erode(thresh, None, iterations=2)
-                # thresh = cv2.dilate(thresh, None, iterations=2)
                 gray = cv2.cvtColor(res, cv2.COLOR_BGR2GRAY)
 
                 lines = lsd(gray)
+
+                selectarr = []
+
 
                 for i in xrange(lines.shape[0]):
 
@@ -109,32 +129,89 @@ def main():
                     x2 = int(lines[i,2])
                     y1 = int(lines[i,1])
                     y2 = int(lines[i,3])
-                    w =  int(lines[i, 4])
+                    w =  int(lines[i,4])
 
                     # Theta is the angle the line makes with the horizontal axis.
                     theta = np.arctan2((y2-y1),(x2-x1))
+                    if theta >= np.pi:
+                        theta = theta - np.pi
                     # l_mag is the length of the line detected.
                     l_mag = np.sqrt(np.square(x1 - x2) + np.square(y1 - y2))
 
+                    # if(select_lines(frame, x1, x2, y1, y2, [lower, upper]) != True):
+                    #     continue
+
                     # For Horizontal Lines:
-                    # if theta < np.pi/30 and theta > -np.pi/30 and abs(l_mag)>75 and abs(l_mag) < 180: 
-                    #     cv2.line(frame,(x1,y1),(x2,y2),(0,255,0),2)
+                    # if abs(theta) < np.pi/20  and abs(theta) > 0 and abs(l_mag)>40 and abs(l_mag) < 180: 
+                    #     cv2.line(res,(x1,y1),(x2,y2),(0,255,0),2)
 
                     # # For Vertical Lines:
-                    # if theta < np.pi*26/20 and theta > -np.pi*26/20 and abs(l_mag)>70 and abs(l_mag) < 110: 
-                        # cv2.line(frame,(x1,y1),(x2,y2),(0,255,0),2)
+                    # if abs(theta) < np.pi/2 + np.pi/36 and abs(theta) >= np.pi/2 - np.pi/36 and abs(l_mag)>10 and abs(l_mag) < 30: 
+                    #     cv2.line(res,(x1,y1),(x2,y2),(0,0,255),2)
 
                     # For all the lines!
-                    cv2.line(frame,(x1,y1),(x2,y2),(0,255,0),2)
+                    if abs(l_mag)>15:
+                        if abs(theta) < np.pi/20  and abs(theta) > 0:
+                            x = x2 - x1
+                            cv2.line(blank,(x1-x,y1),(x2+x,y2),(0,255,0),2)
+                            print('Line number is ' + str(i))
 
-                cv2.imshow('image', frame)
-                k = cv2.waitKey(1000) & 0xFF
-                if k == 113 or k == 27:
-                    break
-                # cv2.waitKey(0)
+                    #     selectarr.append(lines[i])
+                    # cv2.line(res,(x1,y1),(x2,y2),(0,255,0),2)
+
+
+                # blank = cv2.dilate(blank, kernel, iterations=5)
+                cv2.imshow('image', blank)
+                if cv2.waitKey(0) & 0xff == 27:
+                    cv2.destroyAllWindows()
+
+                # lines = lsd(cv2.cvtColor(blank, cv2.COLOR_BGR2GRAY))
+
+                # for i in xrange(lines.shape[0]):
+
+                #     pt1 = (int(lines[i, 0]), int(lines[i, 1]))
+                #     pt2 = (int(lines[i, 2]), int(lines[i, 3]))
+
+                #     x1 = int(lines[i,0])
+                #     x2 = int(lines[i,2])
+                #     y1 = int(lines[i,1])
+                #     y2 = int(lines[i,3])
+                #     w =  int(lines[i,4])
+
+                #     # Theta is the angle the line makes with the horizontal axis.
+                #     theta = np.arctan2((y2-y1),(x2-x1))
+                #     if theta >= np.pi:
+                #         theta = theta - np.pi
+                #     # l_mag is the length of the line detected.
+                #     l_mag = np.sqrt(np.square(x1 - x2) + np.square(y1 - y2))
+
+                #     # if(select_lines(frame, x1, x2, y1, y2, [lower, upper]) != True):
+                #     #     continue
+
+                #     # For Horizontal Lines:
+                #     # if abs(theta) < np.pi/20  and abs(theta) > 0 and abs(l_mag)>40 and abs(l_mag) < 180: 
+                #     #     cv2.line(res,(x1,y1),(x2,y2),(0,255,0),2)
+
+                #     # # For Vertical Lines:
+                #     # if abs(theta) < np.pi/2 + np.pi/36 and abs(theta) >= np.pi/2 - np.pi/36 and abs(l_mag)>10 and abs(l_mag) < 30: 
+                #     #     cv2.line(res,(x1,y1),(x2,y2),(0,0,255),2)
+
+                #     # For all the lines!
+                #     if abs(l_mag)>15:
+                #         cv2.line(blank,(x1,y1),(x2,y2),(0,0,255),2)
+                #         # print('Line number is ' + str(i))
+
+                #     #     selectarr.append(lines[i])
+                #     # cv2.line(res,(x1,y1),(x2,y2),(0,255,0),2)
+
+
+                # cv2.imshow('image', blank)
+
+                # if cv2.waitKey(0) & 0xff == 27:
+                #     cv2.destroyAllWindows()
 
                 
-                # # # Shi-Tomasi                
+                # Shi-Tomasi                
 
 
                 # corners = cv2.goodFeaturesToTrack(gray,10,0.1,10)
@@ -165,66 +242,20 @@ def main():
                 # if cv2.waitKey(0) & 0xff == 27:
                 #     cv2.destroyAllWindows()
 
-                # Finding Contours 
-                # Use a copy of the image e.g. edged.copy() 
-                # since findContours alters the image 
 
-                # contours = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
-                #     cv2.CHAIN_APPROX_SIMPLE)
+                # Following code for dynamically updating values and observing the outcome.
 
-                # contours = imutils.grab_contours(contours)
-                # print(contours)
-                # c = max(contours, key=cv2.contourArea)
-
-                # # image, contours, hierarchy = cv2.findContours(edged,  
-                # #     cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE) 
-                
-                # extLeft = tuple(c[c[:, :, 0].argmin()][0])
-                # extRight = tuple(c[c[:, :, 0].argmax()][0])
-                # extTop = tuple(c[c[:, :, 1].argmin()][0])
-                # extBot = tuple(c[c[:, :, 1].argmax()][0])
-
-                # cv2.drawContours(image, [c], -1, (0, 255, 255), 2)
-                # # cv2.circle(image, extLeft, 8, (0, 0, 255), -1)
-                # # cv2.circle(image, extRight, 8, (0, 255, 0), -1)
-                # # cv2.circle(image, extTop, 8, (255, 0, 0), -1)
-                # # cv2.circle(image, extBot, 8, (255, 255, 0), -1)
-                 
-                # # show the output image
-                # cv2.imshow("Image", image)
-                # cv2.waitKey(0)
-
-
-                # cv2.imshow('Canny Edges After Contouring', edged) 
-                # cv2.waitKey(0) 
-                  
-                # print("Number of Contours found = " + str(len(contours))) 
-                  
-                # # print("Hierarchy is {}".format(np.shape(contours[0])))
-                # # Draw all contours 
-                # # -1 signifies drawing all contours
-
-                # # r, g, b = cv2.split(image)
-
-                # # for i, c in enumerate(contours):
-                # #     area = cv2.contourArea(c)
-                # #     if area > 100 and area < 300:
-                # #         # if b<98 and b >70
-                # #         cv2.drawContours(image, contours, i, (255, 255, 255), 3)      
-                # #         cv2.imshow('Contours', image) 
-                # #         cv2.waitKey(0) 
-                # # #         cv2.destroyAllWindows()
                 # cv2.namedWindow('image')
 
-                # threshold = 0
-                # minLineLength = 10
-                # maxLineGap = 4
-                # limit = 1
+                # x1 = 0
+                # x2 = 10
+                # y1 = 4
+                # y2 = 1
 
-                # cv2.createTrackbar('thresh','image', threshold, 100, callback)
-                # cv2.createTrackbar('minLineLength','image', minLineLength, 100, callback)
-                # cv2.createTrackbar('maxLineGap','image', maxLineGap, 100, callback)
-                # cv2.createTrackbar('resolution','image', limit, 100, callback)
+                # cv2.createTrackbar('x1','image', x1, 360, callback)
+                # cv2.createTrackbar('x2','image', x2, 360, callback)
+                # cv2.createTrackbar('y1','image', y1, 360, callback)
+                # cv2.createTrackbar('y2','image', y2, 360, callback)
 
 
 
@@ -232,12 +263,12 @@ def main():
                 #     frame = res.copy()
                 #     edged = cv2.Canny(gray, 210, 260)
 
-                #     threshold = cv2.getTrackbarPos('thresh','image')
-                #     minLineLength = cv2.getTrackbarPos('minLineLength','image')
-                #     maxLineGap = cv2.getTrackbarPos('maxLineGap','image')
-                #     limit = cv2.getTrackbarPos('resolution','image')
+                #     x1 = cv2.getTrackbarPos('thresh','image')
+                #     x2 = cv2.getTrackbarPos('minLineLength','image')
+                #     y1 = cv2.getTrackbarPos('maxLineGap','image')
+                #     y2 = cv2.getTrackbarPos('resolution','image')
 
-                #     print(minLineLength)
+                #     # print(minLineLength)
                     
                 #     # cv2.imshow("Edge", edged)
                     
@@ -245,8 +276,12 @@ def main():
 
                 #     i = 0
 
-                #     lines = cv2.HoughLinesP(edged,limit,np.pi/180, threshold, minLineLength, maxLineGap)
-                #     print(len(lines))
+                #     theta = np.arctan2((y2-y1),(x2-x1))
+
+                #     print(theta)
+
+                #     lines = cv2.HoughLinesP(edged,10,np.pi/180, 20, 20, 20)
+                #     # print(len(lines))
 
                 #     for i in range(len(lines) - 1):
                 #         for x1,y1,x2,y2 in lines[i]:
