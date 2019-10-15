@@ -13,13 +13,14 @@ from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
-#import color_correct as cc
+import color_correct as cc
 
 class image_converter:
 	def __init__(self):
 		# Load GMM
-		GMMin = 'Yellow_GMM_HSV_5.npz' # Read in GMM parameters
-		thresh = 1e-8
+		#GMMin = 'Yellow_GMM_HSV_5.npz' # Read in GMM parameters
+		GMMin = 'Maroon2_GMM_HSV_5.npz' # Read in GMM parameters
+		thresh = .25#1e-5
 		npzfile = np.load(GMMin)
 		k = npzfile['arr_0']
 		mean = npzfile['arr_1']
@@ -28,12 +29,18 @@ class image_converter:
 		GMMargs = (thresh,k,mean,cov,pi)
 
 		# Initialize Single Gauss Model
-		filename = 'YellowWindow.npy'
+		#filename = 'YellowWindow.npy'
+		filename = 'MaroonWindow_2.npy'
+		thresh_single  = .25#1e-4 # threshold for Maroon
+		BGR_set = np.load(filename)[:3]
 		HSV_set = np.load(filename)[3:]
 		cov_single = np.cov(HSV_set)
 		icov_single = np.linalg.inv(cov_single)
 		mu_single = np.mean(HSV_set,axis = 1)
-		thresh_single  = 1e-20 # threshold for Yellow in HSV is 1e-62
+		#cov_single = np.cov(BGR_set)
+		#icov_single = np.linalg.inv(cov_single)
+		#mu_single = np.mean(BGR_set,axis = 1)
+		
 		single_Gauss = (thresh_single,mu_single,cov_single,icov_single)
 
 		# Maunal HSV Limits
@@ -91,6 +98,7 @@ class image_converter:
 		img_thresh_GMM = GMM(cv_image_small_HSV,thresh,k,mean,cov,pi)
 		# Run Single Gauss
 		img_thresh_Single = SingleGauss(cv_image_small_HSV,thresh_single,mu_single,cov_single,icov_single)
+		#img_thresh_Single = SingleGauss(cv_image_small,thresh_single,mu_single,cov_single,icov_single)
 		# Run Manual Threshold
 		img_thresh_manual = ManualThresh(cv_image_small_HSV,Hlims,Slims,Vlims)
 
@@ -112,26 +120,28 @@ def GMM(img,thresh,k,mean,cov,pi):
 	img_thresh = np.zeros(img.shape) # initialize black image
 	print('Running GMM')
 	icov = np.linalg.inv(cov)
-	p0 = 1/(((2*3.14159)**3*np.linalg.det(cov)))**(0.5)
-	pmax = np.zeros(k)
-	for j in range(0,k):
-		pmax[j] =  p0[j]*np.exp(-.5*np.linalg.multi_dot([[0,0,0],icov[j],[0,0,0]]))
+	#p0 = 1/(((2*3.14159)**3*np.linalg.det(cov)))**(0.5)
+	#pmax = np.zeros(k)
+	#for j in range(0,k):
+	#	pmax[j] =  p0[j]*np.exp(-.5*np.linalg.multi_dot([[0,0,0],icov[j],[0,0,0]]))
 
 	# Loop through pixels and compare each value to the threshold.
 	x=0
 	y=0
 	p = np.zeros(k)
+	po =  np.zeros(img.shape[:2])
 
 	for col in img:
 		for pixel in col:
 			for j in range(0,k):
 				temp = pixel-mean[j]
-				p[j] = pi[j]*p0[j]*np.exp(-.5*np.linalg.multi_dot([temp,icov[j],temp]))/pmax[j]
-			post = np.sum(p)
+				#p[j] = pi[j]*p0[j]*np.exp(-.5*np.linalg.multi_dot([temp,icov[j],temp]))/pmax[j]
+				p[j] = pi[j]*np.linalg.multi_dot([temp,icov[j],temp])
+			po[y,x] = np.sum(p)
 			#print(post)
-			if post <= thresh:
+			#if post <= thresh:
 				# set the pixel to neon pink to stand out
-				img_thresh[y,x] = [199,110,255]
+				#img_thresh[y,x] = [199,110,255]
 				# use this for HSL instead
 				#img_thresh[y,x] = [0, 255, 255]
 			x = x+1
@@ -141,32 +151,38 @@ def GMM(img,thresh,k,mean,cov,pi):
 	#plt.subplot(2,1,1),plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 	#plt.subplot(2,1,2),plt.imshow(cv2.cvtColor(img_thresh, cv2.COLOR_BGR2RGB))
 	#plt.show()
-
-	return img_thresh
+	pnorm = (po/np.max(po))
+	#pnorm = (po/np.mean(po))
+	mask = (pnorm>=thresh).astype('uint8')*255
+	#res = cv2.bitwise_and(img_thresh,img_thresh,mask = mask)
+	return mask
 
 def SingleGauss(img,thresh,mean,cov,icov):
 	img_thresh = np.zeros(img.shape) # initialize black image
 	print('Running Single Gauss')	
-	p0 = 1/(((2*3.14159)**3*np.linalg.det(cov)))**(0.5)
-	pmax =  p0*np.exp(.5*np.linalg.multi_dot([[0,0,0],icov,[0,0,0]]))
+	#p0 = 1/(((2*3.14159)**3*np.linalg.det(cov)))**(0.5)
+	#pmax =  p0*np.exp(.5*np.linalg.multi_dot([[0,0,0],icov,[0,0,0]]))
 
 
 	# Loop through pixels and compare each value to the threshold.
 	x=0
 	y=0
-
+	p =  np.zeros(img.shape[:2])
 	for col in img:
 		for pixel in col:
 			temp = pixel-mean
-			p = p0*np.exp(-.5*np.linalg.multi_dot([temp,icov,temp]))/pmax
-			post = p
-			if post <= thresh:
-				img_thresh[y,x] = [199,110,255]
+			#p[y,x] = p0*np.exp(-.5*np.linalg.multi_dot([temp,icov,temp]))/pmax
+			p[y,x] = np.linalg.multi_dot([temp,icov,temp])
+			#post = p
+			#if post <= thresh:
+			#	img_thresh[y,x] = [199,110,255]
 			x = x+1
 		x = 0
 		y = y+1
-
-	return img_thresh
+	pnorm = (p/np.max(p))
+	mask = (pnorm>=thresh).astype('uint8')*255
+	#res = cv2.bitwise_and(img_thresh,img_thresh,mask = mask)
+	return mask
 
 def ManualThresh(img,Hlims,Slims,Vlims):
 	img_thresh = np.zeros(img.shape) # initialize black image
@@ -178,8 +194,8 @@ def ManualThresh(img,Hlims,Slims,Vlims):
 			if Hlims[0] <= pixel[0] <= Hlims[1]:
 				if Slims[0] <= pixel[1] <= Slims[1]:
 					if Vlims[0] <= pixel[2] <= Vlims[1]:
-						# set the pixel to neon pink to stand out
-						img_thresh[y,x] = [199,110,255]
+						
+						img_thresh[y,x] = [255,255,255]
 			x = x+1
 		x = 0
 		y = y+1
