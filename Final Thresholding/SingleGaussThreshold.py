@@ -51,7 +51,7 @@ mu = np.mean(BGR_set,axis = 1)
 # covariance = np.cov(HSV_set)
 # icovariance = np.linalg.inv(covariance)
 # mu = np.mean(HSV_set,axis = 1)
-thresh  = 1e-1#1e-19#35 # threshold for Yellow in HSV is 1e-62
+thresh  = .18#1e-19#35 # threshold for Yellow in HSV is 1e-62
 # Convert image to HSV
 #img_thresh = cv2.cvtColor(img_thresh, cv2.COLOR_BGR2HSV)
 #
