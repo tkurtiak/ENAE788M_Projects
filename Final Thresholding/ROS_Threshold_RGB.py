@@ -15,6 +15,8 @@ from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 import color_correct as cc
 
+out = cv2.VideoWriter('testvideo.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 10, (384,288))
+
 class image_converter:
 	def __init__(self):
 		# Load GMM
@@ -45,7 +47,7 @@ class image_converter:
 		single_Gauss = (thresh_single,mu_single,cov_single,icov_single)
 
 		# Maunal HSV Limits
-		variance = 20
+		variance = 50
 		Hlims = [mu_single[0]-variance,mu_single[0]+variance]
 		Slims = [mu_single[1]-variance,mu_single[1]+variance]
 		Vlims = [mu_single[2]-variance,mu_single[2]+variance]
@@ -93,7 +95,7 @@ class image_converter:
 		#cv_image_cc_blur_sat = cv2.bitwise_not(cv_image_cc_blur_sat1,cv_image_cc_blur_sat1,mask = mask2)
 		#cv_image_cc = cv_image
 		# SCALE DOWN IMAGE SIZE to 20%
-		scale = .2
+		scale = .3
 		width = int(cv_image_cc.shape[1] * scale)
 		height = int(cv_image_cc.shape[0] * scale)
 		dim = (width, height)
@@ -112,17 +114,41 @@ class image_converter:
 
 		cv2.imshow("Raw Image", cv_image_small)
 		cv2.imshow("GMM Thresholded", img_thresh_GMM)
-		cv2.moveWindow("GMM Thresholded",0,200)
+		cv2.moveWindow("GMM Thresholded",400,0)
 		cv2.imshow("Single Gauss Thresholded", img_thresh_Single)
-		cv2.moveWindow("Single Gauss Thresholded",000,350)
+		cv2.moveWindow("Single Gauss Thresholded",750,0)
 		cv2.imshow("Manual Thresholded", img_thresh_manual)
 		cv2.moveWindow("Manual Thresholded",0,550)
 		cv2.waitKey(1)
+
+
+		GMMout = cv2.bitwise_and(cv_image_small,cv_image_small,mask = img_thresh_GMM)
+		singleout = cv2.bitwise_and(cv_image_small,cv_image_small,mask = img_thresh_Single)
+		manout = cv2.bitwise_and(cv_image_small,cv_image_small,mask = img_thresh_manual)
+		grayOut = cv2.cvtColor(cv_image_small,cv2.COLOR_BGR2GRAY)
+		#manthreshOut = cv2.cvtColor(img_thresh_manual,cv2.COLOR_RGB2GRAY)
+		#print(img_thresh_Single)
+		#print(img_thresh_manual.shape)
+		visL = np.concatenate((cv_image_small, GMMout), axis=0)
+		visR = np.concatenate((singleout, manout), axis=0)
+		vis = np.concatenate((visL,visR),axis =1)
+		print(vis.shape)
+		cv2.imshow("All", vis)
+		cv2.waitKey(1)
+
+
+		# Record video code here
+
+		out.write(vis)
 
 		try:
 			self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image_cc, "bgr8"))
 		except CvBridgeError as e:
 			print(e)
+
+def fast_exp(x):
+	y = 1+x+(x**2)/2+(x**3)/6
+	return y
 
 def GMM(img,thresh,k,mean,cov,pi):
 	img_thresh = np.zeros(img.shape) # initialize black image
@@ -202,6 +228,8 @@ def SingleGauss(img,thresh,mean,cov,icov):
 
 def ManualThresh(img,Hlims,Slims,Vlims):
 	img_thresh = np.zeros(img.shape) # initialize black image
+	mask = np.zeros(img.shape[0:2])
+	#print(mask.shape)
 	# Loop through pixels and compare each value to the threshold.
 	x=0
 	y=0
@@ -210,14 +238,14 @@ def ManualThresh(img,Hlims,Slims,Vlims):
 			if Hlims[0] <= pixel[0] <= Hlims[1]:
 				if Slims[0] <= pixel[1] <= Slims[1]:
 					if Vlims[0] <= pixel[2] <= Vlims[1]:
-						
-						img_thresh[y,x] = [255,255,255]
+						mask[y,x] = 1
+						#img_thresh[y,x] = [255,255,255]
 			x = x+1
 		x = 0
 		y = y+1
 
-
-	return img_thresh
+	mask = mask.astype('uint8')*255
+	return mask
 
 
 def main(args):
@@ -227,6 +255,7 @@ def main(args):
 		rospy.spin()
 	except KeyboardInterrupt:
 		print("Shutting down")
+		out.release() # get rid of video recorder
 		cv2.destroyAllWindows()
 
 if __name__ == '__main__':
