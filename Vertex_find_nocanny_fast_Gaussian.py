@@ -104,6 +104,7 @@ def applyCorners2Mask(mask,img):
 	else:
 		# draw the contour and center of the shape on the image
 		
+		center=np.array([cx0,cy0])
 		min_line_scale=.3
 		if p_min<60:
 			min_line_scale=.5
@@ -131,7 +132,7 @@ def applyCorners2Mask(mask,img):
 			# cv2.imshow('intersections',imgOG)
 
 			if center is None or np.isnan(center).any() or np.isnan(inner_corners).any() or np.isnan(outer_corners).any():
-				return np.zeros((1,2)),np.zeros((4,2)),np.zeros((4,2))
+				return np.array([cx0,cy0]),np.zeros((4,2)),np.zeros((4,2))
 			else:
 				return center, inner_corners, outer_corners
 				
