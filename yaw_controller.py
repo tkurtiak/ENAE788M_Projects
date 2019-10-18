@@ -13,7 +13,7 @@ from std_msgs.msg import Empty, Float64MultiArray, String
 ## VELOCITY VALUES!
 x = 0.3
 y = 0.3
-z = 0.6
+z = 0.4
 yaw = 0.3
 
 time_init = 0.0
@@ -34,7 +34,6 @@ finalflag = False
 pub_commands= rospy.Publisher('bebop/cmd_vel',Twist,queue_size=1)
 pub_takeoff= rospy.Publisher('bebop/takeoff',Empty,queue_size=1)
 pub_land= rospy.Publisher('bebop/land',Empty,queue_size=1) #trigger with pub_land.publish()
-pub_waypoints= rospy.Publisher("/bebop/waypoint_ilya", Point, queue_size=1)
 
 def quat_mult(a,b):
     
@@ -63,43 +62,50 @@ def setlanded(msg):
 
 def solver(msg):
     # global waypoint_xy
-    print('REACHED!')
+    # print('REACHED!')
     global finalflag
     global velocity
     global time_init
     # global waypoint_yaw
-    msg_norm = np.linalg.norm(np.array([msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.x, msg.angular.y, msg.angular.z]))
+    msg_norm = np.linalg.norm(np.array([msg.linear.x, msg.linear.y, msg.linear.z]))#, msg.angular.x, msg.angular.y, msg.angular.z]))
 
     velocity.linear.x = x*(msg.linear.x/msg_norm)
     velocity.linear.y = y*(msg.linear.y/msg_norm)
     velocity.linear.z = z*(msg.linear.z/msg_norm)
     velocity.angular.x = 0
     velocity.angular.y = 0
-    velocity.angular.z = yaw*(msg.angular.z/msg_norm)
+    velocity.angular.z = yaw*(msg.angular.z)
 
-    print(msg.linear.x)
-    print(msg.linear.y)
-    print(msg.linear.z)
+    if ( msg.linear.z/msg_norm > .18):
+        velocity.linear.x=0
+        velocity.linear.y=0
 
-    print(msg.angular.z)
-    print(msg.angular.y)
-    print(msg.angular.x)
-    print(time_init)
-    print(rospy.Time.now() - time_init)
+    # print(msg.linear.x)
+    # print(msg.linear.y)
+    # print(msg.linear.z)
 
-    if 1==1:
+    # print(msg.angular.z)
+    # print(msg.angular.y)
+    # print(msg.angular.x)
+    # print(time_init)
+    # print(rospy.Time.now() - time_init)
+
+    # if 1==1:
+        # finalflag = True
+    dt = rospy.Duration(secs=2)
+    if (rospy.Time.now() - time_init) > dt:
+        time_init = rospy.Time.now()
         finalflag = True
-
-    # if (rospy.Time.now() - time_init) > 2:
-    #     print("time")
-    #     time_init = rospy.Time.now()
-    #     finalflag = True
+        startflag = False
+        velocity = Twist()
+        # time.sleep(2)
     # waypoint_yaw.angular.z = msg.data.angular.z
     # waypoint_yaw.linear.z = msg.data.linear.z
 
     # waypoint_xy.linear.x = msg.data.linear.x
     # waypoint_xy.linear.y = msg.data.linear.y
     # waypoint_xy.linear.z = msg.data.linear.z
+    print(velocity)
 
 def window_callback(data):
     global initial_velocity
@@ -107,7 +113,7 @@ def window_callback(data):
     global startflag
 
     data = data.data
-    print(data)
+    # print(data)
 
     if(data[0]<320):
         initial_velocity.angular.z = -yaw
@@ -115,7 +121,7 @@ def window_callback(data):
         initial_velocity.angular.z = yaw
 
     if data[2]!=0 and data[4]!=0 and data[6]!=0 and data[8]!=0:
-        startflag == True
+        startflag = True
 
 
 def window():
@@ -144,17 +150,22 @@ def window():
     # spin() simply keeps python from exiting until this node is stopped
 
     while not rospy.is_shutdown():
-
-        while(startflag!=True):
+        
+        while(startflag!=True and finalflag!=True):
+            print("Initial Vel")
+            # print("startf ", startflag)
+            # print("endf ", finalflag)
             pub_commands.publish(initial_velocity)
 
-        while(finalflag!=True):
-            print("Final vel")
+        while(finalflag==True):
+            # print("Final vel")
             pub_commands.publish(velocity)
+
         # move_yaw(waypoint_yaw.angular.z)
         # moveto(waypoint_xy.linear.x, waypoint_xy.linear.y, waypoint_xy.linear.z)
 
         rate.sleep()
+        rospy.spin()
 
 # def move_yaw(yaw)
 #     global global_pos
