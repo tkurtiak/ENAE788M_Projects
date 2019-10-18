@@ -50,7 +50,7 @@ def FindVector():
 	global global_firstPnP
 
 	rospy.init_node('desired_vector_finder', anonymous=True, log_level=rospy.WARN)
-	rospy.Subscriber('PnP',Pose, callback_PnP)
+	rospy.Subscriber('pnp',Pose, callback_PnP)
 	pub_vect= rospy.Publisher('bebop/desired_vector',Twist,queue_size=1)
 
 	#quat X to Y is the orientation of Y relative to X, so it is the oration to get a vector in X rotated into Y
